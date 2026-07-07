@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy Apple Orchard Snake Game</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Cozy fonts) -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f3f7f0;
+            touch-action: manipulation;
+        }
+        .font-cozy {
+            font-family: 'Fredoka One', cursive, 'Nunito', sans-serif;
+        }
+        /* Custom Wood Bezel and Soft Shadows with expanded dimensions */
+        .wood-border {
+            border: 14px solid #5d4037;
+            border-radius: 32px;
+            box-shadow: inset 0 4px 12px rgba(0,0,0,0.35), 0 12px 30px rgba(93, 64, 55, 0.3);
+        }
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col items-center justify-between overflow-x-hidden p-2 sm:p-4">
+
+    <!-- HEADER -->
+    <header class="w-full max-w-6xl lg:max-w-7xl flex justify-between items-center py-3 px-5 glass-panel rounded-2xl shadow-md mb-4 border border-emerald-100">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-md shadow-emerald-200">
+                <i class="fa-solid fa-apple-whole text-white text-2xl animate-bounce"></i>
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black tracking-wide text-emerald-800 font-cozy">APPLE ORCHARD</h1>
+                <p class="text-[10px] text-emerald-600 font-bold tracking-widest uppercase">Ultra Juicy Smooth v4.5</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Audio Toggle -->
+            <button id="soundToggleBtn" class="w-10 h-10 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition flex items-center justify-center border border-emerald-200 text-emerald-600" title="소리 켜기/끄기">
+                <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+            </button>
+            <!-- Help Trigger -->
+            <button id="helpBtn" class="w-10 h-10 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition flex items-center justify-center border border-emerald-200 text-emerald-600" title="도움말">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME CONTAINER -->
+    <main class="w-full max-w-6xl lg:max-w-7xl flex flex-col lg:flex-row gap-6 items-stretch flex-grow justify-center">
+        <!-- LEFT: Expanded Game Screen Area -->
+        <div class="flex-1 flex flex-col items-center justify-center glass-panel rounded-3xl p-6 border border-emerald-100 shadow-xl relative min-h-[500px]">
+            
+            <!-- STATS HUD BAR -->
+            <div class="w-full max-w-[650px] flex justify-between items-center mb-4 px-2 font-cozy">
+                <div class="flex gap-4">
+                    <div class="bg-emerald-50/80 px-4 py-2 rounded-xl border border-emerald-100 shadow-sm">
+                        <div class="text-[10px] text-emerald-600 font-bold tracking-wider">MY SCORE</div>
+                        <div id="scoreDisplay" class="text-xl sm:text-2xl font-black text-emerald-900">00000</div>
+                    </div>
+                    <div class="bg-amber-50/80 px-4 py-2 rounded-xl border border-amber-100 shadow-sm">
+                        <div class="text-[10px] text-amber-700 font-bold tracking-wider">BEST ORCHARD</div>
+                        <div id="highScoreDisplay" class="text-xl sm:text-2xl font-black text-amber-900">00000</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <div id="levelBadge" class="bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-2 rounded-xl shadow-md flex flex-col items-center">
+                        <span class="text-[9px] text-emerald-100 font-bold">LEVEL</span>
+                        <span id="levelDisplay" class="text-lg font-black text-white leading-tight">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- THE CANVAS CONTAINER WITH WOOD BEZEL (Now maxes out at 650px for massive play) -->
+            <div class="relative w-full aspect-square max-w-[650px] wood-border overflow-hidden bg-emerald-800">
+                <!-- Main Canvas -->
+                <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
+
+                <!-- ACTIVE BUFFS HUD ON CANVAS -->
+                <div id="activeBuffs" class="absolute top-3 left-3 flex flex-col gap-2 pointer-events-none transition-all duration-300">
+                    <!-- Buff templates injected dynamically -->
+                </div>
+
+                <!-- OVERLAY: START SCREEN -->
+                <div id="startScreen" class="absolute inset-0 bg-stone-900/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center transition-all duration-500 z-10">
+                    <div class="relative mb-5">
+                        <div class="absolute -inset-1 rounded-full bg-gradient-to-r from-red-400 to-amber-500 blur-md opacity-75 animate-pulse"></div>
+                        <div class="relative w-20 h-20 rounded-full bg-white border-2 border-amber-800 flex items-center justify-center shadow-lg">
+                            <i class="fa-solid fa-seedling text-emerald-600 text-4xl animate-bounce"></i>
+                        </div>
+                    </div>
+                    <h2 class="text-3xl sm:text-4xl font-black mb-2 tracking-wide font-cozy text-white">
+                        APPLE ORCHARD
+                    </h2>
+                    <p class="text-stone-300 text-sm max-w-md mb-6 leading-relaxed">
+                        하나로 이어진 부드러운 스네이크와 함께!<br>
+                        함정이 없는 평화로운 과수원에서 최고 점수 기록을 세워보세요.
+                    </p>
+                    <button id="startGameBtn" class="px-10 py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-950/40 transform hover:-translate-y-0.5 active:translate-y-0 transition-all font-cozy text-xl tracking-wider">
+                        START HARVEST
+                    </button>
+                </div>
+
+                <!-- OVERLAY: GAME OVER -->
+                <div id="gameOverScreen" class="absolute inset-0 bg-stone-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center transition-all duration-500 z-10 hidden opacity-0">
+                    <div class="w-16 h-16 rounded-full bg-red-100 border-2 border-red-500 flex items-center justify-center mb-4 text-red-600 animate-bounce">
+                        <i class="fa-solid fa-heart-crack text-3xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-black mb-1 text-red-500 font-cozy tracking-wide">수확 일시 중단</h2>
+                    <p class="text-stone-400 text-sm mb-6" id="gameOverReason">울타리에 가로막혔습니다.</p>
+                    
+                    <div class="bg-stone-900 border border-stone-800 rounded-2xl p-4 w-full max-w-xs mb-6 font-cozy flex justify-around">
+                        <div>
+                            <div class="text-xs text-stone-500">FINAL SCORE</div>
+                            <div id="finalScore" class="text-2xl font-bold text-white">0</div>
+                        </div>
+                        <div class="border-r border-stone-800"></div>
+                        <div>
+                            <div class="text-xs text-stone-500">MAX LEVEL</div>
+                            <div id="finalLevel" class="text-2xl font-bold text-emerald-400">1</div>
+                        </div>
+                    </div>
+
+                    <button id="restartGameBtn" class="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-2xl shadow-lg transform hover:-translate-y-0.5 transition-all font-cozy tracking-wider">
+                        RESTART GAME
+                    </button>
+                </div>
+
+                <!-- OVERLAY: PAUSE -->
+                <div id="pauseScreen" class="absolute inset-0 bg-stone-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center transition-all duration-300 z-10 hidden opacity-0">
+                    <div class="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-500 flex items-center justify-center mb-4 text-emerald-600">
+                        <i class="fa-solid fa-pause text-2xl animate-pulse"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-white font-cozy tracking-widest mb-6">GAME PAUSED</h2>
+                    <button id="resumeGameBtn" class="px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-2xl shadow-lg transition-all font-cozy">
+                        RESUME HARVEST
+                    </button>
+                </div>
+            </div>
+
+            <!-- IN-GAME PAUSE BUTTON -->
+            <button id="inGamePauseBtn" class="mt-4 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 rounded-xl text-xs font-bold text-emerald-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-pause"></i> 일시 정지 (ESC)
+            </button>
+        </div>
+
+        <!-- RIGHT: Settings, Controls & Dashboard -->
+        <div class="w-full lg:w-80 flex flex-col gap-4">
+            <!-- Game Setup Card -->
+            <div class="glass-panel rounded-3xl p-5 border border-emerald-100 shadow-lg flex flex-col gap-4">
+                <h3 class="text-sm font-bold text-emerald-800 uppercase tracking-widest border-b border-emerald-100 pb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-seedling"></i> 과수원 옵션 설정
+                </h3>
+                
+                <!-- GAME MODE -->
+                <div>
+                    <label class="block text-xs font-semibold text-emerald-700 mb-2">게임 규칙 모드</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="modeClassic" class="py-2.5 px-3 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-700 text-xs font-bold transition hover:bg-emerald-500/20" data-mode="classic">
+                            <i class="fa-solid fa-border-all mr-1"></i> 클래식 (벽 사망)
+                        </button>
+                        <button id="modeArcade" class="py-2.5 px-3 rounded-xl border border-stone-200 bg-white text-stone-400 text-xs font-bold transition hover:bg-stone-50" data-mode="arcade">
+                            <i class="fa-solid fa-infinity mr-1"></i> 아케이드 (관통)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DIFFICULTY / SPEED -->
+                <div>
+                    <label class="block text-xs font-semibold text-emerald-700 mb-2">기본 속도 스펙트럼</label>
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+                        <button class="diff-btn py-2 rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50" data-speed="190">여유롭게</button>
+                        <button class="diff-btn py-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-700" data-speed="135">기본속도</button>
+                        <button class="diff-btn py-2 rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50" data-speed="90">익스트림</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIRTUAL CONTROLLER FOR MOBILE -->
+            <div id="virtualController" class="glass-panel rounded-3xl p-4 border border-emerald-100 shadow-lg flex flex-col items-center justify-center lg:hidden">
+                <div class="text-[10px] text-emerald-600 font-bold tracking-widest uppercase mb-2">가상 방향 조작키</div>
+                <div class="relative w-36 h-36">
+                    <!-- UP -->
+                    <button id="ctrlUp" class="absolute top-0 left-12 w-12 h-12 bg-emerald-50 active:bg-emerald-600 rounded-2xl flex items-center justify-center text-emerald-700 active:text-white border border-emerald-200 shadow-sm transform active:scale-95 transition-all">
+                        <i class="fa-solid fa-chevron-up text-lg"></i>
+                    </button>
+                    <!-- LEFT -->
+                    <button id="ctrlLeft" class="absolute top-12 left-0 w-12 h-12 bg-emerald-50 active:bg-emerald-600 rounded-2xl flex items-center justify-center text-emerald-700 active:text-white border border-emerald-200 shadow-sm transform active:scale-95 transition-all">
+                        <i class="fa-solid fa-chevron-left text-lg"></i>
+                    </button>
+                    <!-- RIGHT -->
+                    <button id="ctrlRight" class="absolute top-12 right-0 w-12 h-12 bg-emerald-50 active:bg-emerald-600 rounded-2xl flex items-center justify-center text-emerald-700 active:text-white border border-emerald-200 shadow-sm transform active:scale-95 transition-all">
+                        <i class="fa-solid fa-chevron-right text-lg"></i>
+                    </button>
+                    <!-- DOWN -->
+                    <button id="ctrlDown" class="absolute bottom-0 left-12 w-12 h-12 bg-emerald-50 active:bg-emerald-600 rounded-2xl flex items-center justify-center text-emerald-700 active:text-white border border-emerald-200 shadow-sm transform active:scale-95 transition-all">
+                        <i class="fa-solid fa-chevron-down text-lg"></i>
+                    </button>
+                    <!-- Center Core -->
+                    <div class="absolute top-12 left-12 w-12 h-12 bg-emerald-100 rounded-2xl border border-emerald-200 flex items-center justify-center text-emerald-600">
+                        <div class="w-3 h-3 rounded-full bg-emerald-500/30 animate-ping"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SYSTEM INSTRUCTIONS / LEGEND -->
+            <div class="glass-panel rounded-3xl p-5 border border-emerald-100 shadow-lg text-xs text-stone-600 flex flex-col gap-3">
+                <h4 class="font-bold text-emerald-800 flex items-center gap-1.5 uppercase tracking-wide">
+                    <i class="fa-solid fa-apple-whole text-emerald-500"></i> 사과 품종 & 확률 테이블
+                </h4>
+                <ul class="space-y-3 leading-relaxed">
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 text-lg">🍎</div>
+                        <div>
+                            <p class="font-black text-stone-800">새빨간 사과 <span class="text-red-500">(85% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500">점수 +10 획득하며 몸이 한 칸 늘어납니다.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 text-lg">🍏</div>
+                        <div>
+                            <p class="font-black text-amber-700">황금 사과 <span class="text-amber-600">(10% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500">점수 +30 획득하며 <strong>몸이 부드럽게 3칸 증가</strong>합니다.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0 text-lg">🌈</div>
+                        <div>
+                            <p class="font-black text-purple-700">무지개 사과 <span class="text-purple-600">(5% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500"><strong>5초간 속도 50% 증가 및 무적</strong>(몸에 닿아도 안 죽음) 상태가 됩니다!</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="w-full max-w-6xl lg:max-w-7xl text-center py-4 text-xs text-stone-500 border-t border-emerald-100 mt-6 flex flex-col sm:flex-row justify-between items-center gap-2 px-2">
+        <p>© 2026 COZY APPLE ORCHARD. Ultra-Smooth 60FPS Snake Engine.</p>
+        <div class="flex gap-4">
+            <span class="flex items-center gap-1"><i class="fa-brands fa-html5 text-orange-500"></i> Smooth Interpolation</span>
+            <span class="flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-emerald-500"></i> CSS3 & Canvas2D</span>
+        </div>
+    </footer>
+
+    <!-- MODAL: HELP -->
+    <div id="helpModal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white border-2 border-emerald-100 rounded-3xl max-w-md w-full p-6 shadow-2xl relative transform scale-95 transition-transform duration-300">
+            <button id="closeHelpBtn" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-400 hover:text-stone-700 transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-xl font-black mb-4 font-cozy text-emerald-700 flex items-center gap-2">
+                <i class="fa-solid fa-compass"></i> 오차드 플레이 가이드
+            </h3>
+            <div class="space-y-4 text-sm text-stone-600 leading-relaxed">
+                <div>
+                    <h4 class="font-bold text-stone-800 mb-1">⌨️ 키보드 조작법</h4>
+                    <p>방향키 <span class="bg-stone-100 px-1.5 py-0.5 rounded text-xs border border-stone-200 font-mono">↑, ↓, ←, →</span> 또는 <span class="bg-stone-100 px-1.5 py-0.5 rounded text-xs border border-stone-200 font-mono">W, A, S, D</span>로 조작합니다.</p>
+                    <p class="mt-1">일시정지는 <span class="bg-stone-100 px-1.5 py-0.5 rounded text-xs border border-stone-200 font-mono">ESC</span> 또는 <span class="bg-stone-100 px-1.5 py-0.5 rounded text-xs border border-stone-200 font-mono">Spacebar</span> 입니다.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-stone-800 mb-1">📱 터치 스와이프</h4>
+                    <p>화면 캔버스 자체를 손가락으로 가볍게 쓸어 넘기거나(Swipe), 하단의 에메랄드색 가상 십자패드로 기민하게 조절할 수 있습니다.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-stone-800 mb-1">🍎 성장 시스템 정보</h4>
+                    <ul class="list-disc list-inside space-y-1 text-stone-500">
+                        <li>황금 사과를 먹으면 꼬리가 3칸 연속으로 돋아납니다.</li>
+                        <li>무지개 사과는 속도가 1.5배 빨라지며 이 기간 동안 수확 점수가 2배가 됩니다.</li>
+                        <li>레벨이 올라갈수록 과수원에 통나무 장애물이 설치되니 요리조리 피해가세요!</li>
+                    </ul>
+                </div>
+            </div>
+            <button id="confirmHelpBtn" class="mt-6 w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition shadow-md">
+                과수원으로 들어가기
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC / SCRIPTS -->
+    <script>
+        
+        // --- Cozy Audio Synth Engine ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playBeep(freq, type, duration, vol = 0.1) {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.error("Audio error: ", e);
+                }
+            }
+
+            playEat() {
+                this.playBeep(523.25, 'triangle', 0.1, 0.15); // C5 Cozy Pop
+                setTimeout(() => this.playBeep(659.25, 'triangle', 0.12, 0.1), 40); // E5
+            }
+
+            playGoldEat() {
+                this.playBeep(587.33, 'sine', 0.1, 0.15);
+                setTimeout(() => this.playBeep(783.99, 'sine', 0.08, 0.15), 60);
+                setTimeout(() => this.playBeep(1046.50, 'sine', 0.2, 0.15), 110);
+            }
+
+            playRainbow() {
+                // Magical ascending harp chord
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playBeep(freq, 'sine', 0.25, 0.08);
+                    }, idx * 60);
+                });
+            }
+
+            playCrash() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const duration = 0.4;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + duration);
+                    
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+
+            playLevelUp() {
+                this.playBeep(440.00, 'sine', 0.12, 0.15); // A4
+                setTimeout(() => this.playBeep(554.37, 'sine', 0.12, 0.15), 80); // C#5
+                setTimeout(() => this.playBeep(659.25, 'sine', 0.12, 0.15), 160); // E5
+                setTimeout(() => this.playBeep(880.00, 'sine', 0.25, 0.2), 240); // A5
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Target grid dimensions
+        const GRID_SIZE = 20; // Perfect 20x20 Grid
+        let tileSize = 0; // Dynamic tiles size
+
+        // --- GAME STATE ---
+        let snake = [];        // Current grid coordinates
+        let prevSnake = [];    // Coordinates from PREVIOUS physics tick (for LERP)
+        let direction = { x: 0, y: -1 };
+        
+        // Command Input Queue for Instant Responsiveness
+        let directionQueue = [];
+        
+        let baseSpeed = 135;   // ms per logical tick (Adjusted from 120 for slightly relaxed difficulty)
+        let lastTickTime = 0;  // Timestamp of last physics tick
+        let isPlaying = false;
+        let isPaused = false;
+        let score = 0;
+        let highScore = localStorage.getItem('cozy_snake_highscore') || 0;
+        let currentLevel = 1;
+        let gameMode = 'classic'; // 'classic' or 'arcade'
+
+        let items = []; // Holds active 사과 instances
+        let obstacles = []; // ALWAYS EMPTY
+        let particles = []; // Leaf / Petal explosions
+
+        // Floating Text popups (+10, +30, etc.)
+        class FloatingText {
+            constructor(x, y, text, color) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.alpha = 1.0;
+                this.vy = -1.5; // Upward drift
+            }
+            update() {
+                this.y += this.vy;
+                this.alpha -= 0.025; // fade out
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.font = "bold 16px 'Fredoka One', 'Nunito', sans-serif";
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 4;
+                ctx.textAlign = 'center';
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+        let floatingTexts = [];
+
+        // Dynamic screen shake state
+        let shakeTime = 0;
+        let shakeIntensity = 0;
+
+        function triggerShake(duration, intensity) {
+            shakeTime = duration;
+            shakeIntensity = intensity;
+        }
+
+        // Buffer for tail growth (Golden Apple increases 3 tails)
+        let growthPending = 0;
+
+        // Rainbow Buff state tracking (5000ms duration)
+        let rainbowTimer = 0;
+
+        // Touch swipe track
+        let touchStart = { x: 0, y: 0 };
+
+        // Dynamic Resize Handling (Enlarged to 650px)
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const size = Math.min(container.clientWidth, 650);
+            canvas.width = size;
+            canvas.height = size;
+            tileSize = size / GRID_SIZE;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Display Highscore
+        document.getElementById('highScoreDisplay').innerText = String(highScore).padStart(5, '0');
+
+        // Custom Item Spawner with precise probabilities: 사과(85%), 황금사과(10%), 무지개사과(5%)
+        class OrchardItem {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'apple' (85%), 'gold_apple' (10%), 'rainbow_apple' (5%)
+                this.pulse = Math.random() * Math.PI; // Pulse offset
+            }
+
+            draw() {
+                const px = this.x * tileSize;
+                const py = this.y * tileSize;
+                const half = tileSize / 2;
+
+                this.pulse += 0.07;
+                // 사과 크기를 기존보다 약 40% 대폭 키워 가시성을 대폭 상향 (1.0 -> 1.4)
+                const scale = 1.4 + Math.sin(this.pulse) * 0.09;
+
+                ctx.save();
+                ctx.translate(px + half, py + half);
+                ctx.scale(scale, scale);
+
+                // Let's draw exquisite Vector apples depending on type
+                if (this.type === 'apple') {
+                    // 1. Red Apple Shadow
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = 'rgba(220, 38, 38, 0.4)';
+                    
+                    // 2. Stem
+                    ctx.strokeStyle = '#5c4033';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -2);
+                    ctx.quadraticCurveTo(3, -12, 6, -11);
+                    ctx.stroke();
+
+                    // 3. Green Leaf
+                    ctx.fillStyle = '#4caf50';
+                    ctx.beginPath();
+                    ctx.ellipse(3, -9, 4, 2, Math.PI / -4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 4. Apple Body (Cozy Heart Shape)
+                    ctx.fillStyle = '#e53935';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -3);
+                    ctx.bezierCurveTo(-5, -9, -11, -5, -9, 1);
+                    ctx.bezierCurveTo(-7, 7, -3, 9, 0, 8);
+                    ctx.bezierCurveTo(3, 9, 7, 7, 9, 1);
+                    ctx.bezierCurveTo(11, -5, 5, -9, 0, -3);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 5. Shine Highlight
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+                    ctx.beginPath();
+                    ctx.ellipse(-4, -2, 2.5, 1.2, Math.PI / -3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'gold_apple') {
+                    // Gold Apple
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
+
+                    // Stem
+                    ctx.strokeStyle = '#4e342e';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -2);
+                    ctx.quadraticCurveTo(3, -12, 6, -11);
+                    ctx.stroke();
+
+                    // Leaf
+                    ctx.fillStyle = '#ffb300';
+                    ctx.beginPath();
+                    ctx.ellipse(3, -9, 4, 2, Math.PI / -4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Gold Apple Body
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -3);
+                    ctx.bezierCurveTo(-5, -9, -11, -5, -9, 1);
+                    ctx.bezierCurveTo(-7, 7, -3, 9, 0, 8);
+                    ctx.bezierCurveTo(3, 9, 7, 7, 9, 1);
+                    ctx.bezierCurveTo(11, -5, 5, -9, 0, -3);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Shine Highlight
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.beginPath();
+                    ctx.ellipse(-4, -2, 2.5, 1.2, Math.PI / -3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tiny sparkle
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    const sp = Math.sin(this.pulse * 2) * 2;
+                    ctx.arc(5, 4, Math.max(0.5, sp), 0, Math.PI*2);
+                    ctx.fill();
+
+                } else if (this.type === 'rainbow_apple') {
+                    // Rainbow Apple (Radial Rainbow Gradient)
+                    ctx.shadowBlur = 14;
+                    ctx.shadowColor = 'rgba(168, 85, 247, 0.5)';
+
+                    // Stem
+                    ctx.strokeStyle = '#7e22ce';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -2);
+                    ctx.quadraticCurveTo(3, -12, 6, -11);
+                    ctx.stroke();
+
+                    // Leaf (Bright Aqua/Indigo)
+                    ctx.fillStyle = '#10b981';
+                    ctx.beginPath();
+                    ctx.ellipse(3, -9, 4, 2, Math.PI / -4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Rainbow Gradient Fill
+                    const rGrad = ctx.createRadialGradient(-3, -3, 1, 0, 0, tileSize / 2);
+                    rGrad.addColorStop(0, '#ffffff');
+                    rGrad.addColorStop(0.2, '#f43f5e'); // Pinkish-Red
+                    rGrad.addColorStop(0.5, '#eab308'); // Yellow
+                    rGrad.addColorStop(0.8, '#06b6d4'); // Cyan
+                    rGrad.addColorStop(1, '#a855f7');   // Purple
+                    
+                    ctx.fillStyle = rGrad;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -3);
+                    ctx.bezierCurveTo(-5, -9, -11, -5, -9, 1);
+                    ctx.bezierCurveTo(-7, 7, -3, 9, 0, 8);
+                    ctx.bezierCurveTo(3, 9, 7, 7, 9, 1);
+                    ctx.bezierCurveTo(11, -5, 5, -9, 0, -3);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Star-like particles near Rainbow Apple
+                    ctx.fillStyle = '#ffffff';
+                    ctx.save();
+                    ctx.rotate(this.pulse);
+                    ctx.fillRect(8, -8, 2, 2);
+                    ctx.fillRect(-10, 6, 2, 2);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // Particle Exploder for cozy orchard feeling
+        class OrchardParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6 - 1.0; // Dynamic spray
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.025 + 0.02;
+                this.size = Math.random() * 5 + 2.5;
+                this.shape = Math.random() > 0.4 ? 'petal' : 'circle';
+                this.rot = Math.random() * Math.PI;
+                this.rotSpeed = (Math.random() - 0.5) * 0.15;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rot += this.rotSpeed;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+                ctx.fillStyle = this.color;
+
+                if (this.shape === 'petal') {
+                    // Draw nice little leaf/petal shape
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size);
+                    ctx.quadraticCurveTo(this.size * 0.7, 0, 0, this.size);
+                    ctx.quadraticCurveTo(-this.size * 0.7, 0, 0, -this.size);
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(x, y, type) {
+            const screenX = x * tileSize + tileSize / 2;
+            const screenY = y * tileSize + tileSize / 2;
+            let colors = [];
+            
+            if (type === 'apple') colors = ['#f43f5e', '#ef4444', '#b91c1c', '#a7f3d0'];
+            else if (type === 'gold_apple') colors = ['#f59e0b', '#fbbf24', '#ffb300', '#fffbeb', '#fef3c7'];
+            else if (type === 'rainbow_apple') colors = ['#ff007f', '#ff7f00', '#ffea00', '#00ff7f', '#00eaff', '#7f00ff'];
+            else colors = ['#81c784', '#a7f3d0', '#ffffff']; // Default sweet sparkles
+
+            for (let i = 0; i < 22; i++) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                particles.push(new OrchardParticle(screenX, screenY, color));
+            }
+        }
+
+        // Spawn Apples with probabilistic weighted logic: 사과(85%), 황금사과(10%), 무지개사과(5%)
+        function spawnItem() {
+            let rx, ry;
+            let occupied = true;
+            while (occupied) {
+                rx = Math.floor(Math.random() * GRID_SIZE);
+                ry = Math.floor(Math.random() * GRID_SIZE);
+                
+                const hitSnake = snake.some(part => part.x === rx && part.y === ry);
+                const hitItem = items.some(it => it.x === rx && it.y === ry);
+
+                if (!hitSnake && !hitItem) {
+                    occupied = false;
+                }
+            }
+
+            // 확률 조정: 사과(85%), 황금사과(10%), 무지개사과(5%)
+            const rng = Math.random();
+            let type = 'apple';
+            if (rng > 0.85 && rng <= 0.95) {
+                type = 'gold_apple';
+            } else if (rng > 0.95) {
+                type = 'rainbow_apple';
+            }
+
+            items.push(new OrchardItem(rx, ry, type));
+        }
+
+        // Initialize Setup
+        function initGame() {
+            snake = [
+                { x: 10, y: 10 },
+                { x: 10, y: 11 },
+                { x: 10, y: 12 }
+            ];
+            prevSnake = JSON.parse(JSON.stringify(snake));
+            
+            direction = { x: 0, y: -1 };
+            directionQueue = []; // Clear key-input buffering queue on start
+            
+            score = 0;
+            currentLevel = 1;
+            growthPending = 0;
+            rainbowTimer = 0;
+            
+            items = [];
+            particles = [];
+            floatingTexts = [];
+            obstacles = []; // Ensure empty
+            
+            updateHUD();
+            spawnItem();
+            spawnItem(); // Maintain 2 apples on map
+            
+            lastTickTime = performance.now();
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').innerText = String(score).padStart(5, '0');
+            document.getElementById('levelDisplay').innerText = currentLevel;
+
+            // Render Rainbow countdown on canvas
+            const buffsContainer = document.getElementById('activeBuffs');
+            buffsContainer.innerHTML = '';
+            
+            if (rainbowTimer > 0) {
+                const badge = document.createElement('div');
+                badge.className = `bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 text-white px-3 py-1.5 rounded-xl border border-white text-xs font-black shadow-md flex items-center gap-1.5 animate-bounce`;
+                badge.innerHTML = `🌈 무적 가속 상태! (${(rainbowTimer / 1000).toFixed(1)}s)`;
+                buffsContainer.appendChild(badge);
+            }
+        }
+
+        // Get dynamic interval with Rainbow buff support (1.5x speedup = 50% speed increase)
+        function getCurrentInterval() {
+            let activeSpeed = baseSpeed;
+            
+            // Speed scaling based on score
+            const levelFactor = Math.min((currentLevel - 1) * 6, 40);
+            activeSpeed -= levelFactor;
+
+            // Rainbow Apple boost: 1.5x Speedup (50% increase)
+            if (rainbowTimer > 0) {
+                activeSpeed /= 1.5;
+            }
+
+            return Math.max(activeSpeed, 45); // Speed Floor
+        }
+
+        // Logical Grid Physics Engine Update (Discrete ticks)
+        function updatePhysics() {
+            if (isPaused || !isPlaying) return;
+
+            // Lock previous coordinates to allow smooth linear LERP
+            prevSnake = JSON.parse(JSON.stringify(snake));
+
+            // Pull the next planned movement from queue if available (Solves input lag/miss)
+            if (directionQueue.length > 0) {
+                direction = directionQueue.shift();
+            }
+
+            const head = snake[0];
+            let newHead = { x: head.x + direction.x, y: head.y + direction.y };
+
+            // Wall Collisions
+            if (gameMode === 'classic') {
+                if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
+                    triggerGameOver("농장 밖의 거친 가시나무 울타리에 충돌했습니다.");
+                    return;
+                }
+            } else {
+                // Arcade wrap
+                if (newHead.x < 0) newHead.x = GRID_SIZE - 1;
+                else if (newHead.x >= GRID_SIZE) newHead.x = 0;
+                
+                if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
+                else if (newHead.y >= GRID_SIZE) newHead.y = 0;
+            }
+
+            // Self Collision (Disabled if Rainbow mode is active: "발꼬임 없음")
+            const bitSelf = snake.some(part => part.x === newHead.x && part.y === newHead.y);
+            if (bitSelf) {
+                if (rainbowTimer > 0) {
+                    // Ignore self-collision during rainbow active state! Create sweet protection sparks
+                    const px = newHead.x * tileSize + tileSize / 2;
+                    const py = newHead.y * tileSize + tileSize / 2;
+                    for (let i = 0; i < 6; i++) {
+                        particles.push(new OrchardParticle(px, py, '#e0f2fe'));
+                    }
+                } else {
+                    triggerGameOver("스네이크가 기운차게 전진하다 발이 꼬였습니다.");
+                    return;
+                }
+            }
+
+            // Shift Head forward
+            snake.unshift(newHead);
+
+            // Item Detection
+            let ateFood = false;
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                if (newHead.x === item.x && newHead.y === item.y) {
+                    processEating(item);
+                    items.splice(i, 1);
+                    ateFood = true;
+                    break;
+                }
+            }
+
+            // Handle tail trimming or growing
+            if (growthPending > 0) {
+                growthPending--;
+                // Don't trim tail this tick = grows longer!
+            } else {
+                if (!ateFood) {
+                    snake.pop();
+                }
+            }
+
+            if (ateFood) {
+                spawnItem();
+                // 15% probability of spawning supplementary helper apple
+                if (Math.random() < 0.15 && items.length < 3) {
+                    spawnItem();
+                }
+            }
+        }
+
+        // Process eating customized apples (with user specs)
+        function processEating(item) {
+            let addedScore = 10;
+            const textX = item.x * tileSize + tileSize / 2;
+            const textY = item.y * tileSize;
+
+            if (item.type === 'apple') {
+                growthPending += 1; // Grow 1
+                sound.playEat();
+                createExplosion(item.x, item.y, 'apple');
+                triggerShake(120, 3); // Mild pleasant shake
+                floatingTexts.push(new FloatingText(textX, textY, "+10", "#f43f5e"));
+            } else if (item.type === 'gold_apple') {
+                growthPending += 3; // Grow 3 (Tripled growth!)
+                addedScore = 30;    // Tripled points
+                sound.playGoldEat();
+                createExplosion(item.x, item.y, 'gold_apple');
+                triggerShake(200, 6); // More intense pleasant shake
+                floatingTexts.push(new FloatingText(textX, textY, "+30 🌟", "#fbbf24"));
+            } else if (item.type === 'rainbow_apple') {
+                growthPending += 1; // Standard growth
+                rainbowTimer = 5000; // Trigger speed boost & invincibility (5 seconds)
+                sound.playRainbow();
+                createExplosion(item.x, item.y, 'rainbow_apple');
+                triggerShake(250, 8); // Satisfying rainbow shake
+                floatingTexts.push(new FloatingText(textX, textY, "RAINBOW 무적! 🌈", "#c084fc"));
+            }
+
+            score += addedScore;
+
+            // Handle Level Up
+            const nextLevelTarget = Math.floor(score / 100) + 1;
+            if (nextLevelTarget > currentLevel) {
+                currentLevel = nextLevelTarget;
+                sound.playLevelUp();
+            }
+
+            updateHUD();
+        }
+
+        // Linear interpolation helper
+        function lerp(start, end, t) {
+            return start + (end - start) * t;
+        }
+
+        // Pure 60FPS continuous Animation Loop using requestAnimationFrame
+        function animateLoop(timestamp) {
+            if (!isPlaying) return;
+
+            // Track continuous timer for logical physics ticks
+            const currentInterval = getCurrentInterval();
+            const elapsed = timestamp - lastTickTime;
+
+            if (!isPaused) {
+                // Decay rainbow timer by elapsed frame time
+                if (rainbowTimer > 0) {
+                    rainbowTimer -= (timestamp - (window.lastFrameTime || timestamp));
+                    if (rainbowTimer < 0) rainbowTimer = 0;
+                    updateHUD();
+                }
+
+                // Decay shake timer
+                if (shakeTime > 0) {
+                    shakeTime -= (timestamp - (window.lastFrameTime || timestamp));
+                }
+
+                if (elapsed >= currentInterval) {
+                    updatePhysics();
+                    // Keep overflow fractional time to stay precise
+                    lastTickTime = timestamp - (elapsed % currentInterval);
+                }
+            }
+
+            window.lastFrameTime = timestamp;
+
+            // Calculate current interpolation progress (0.0 to 1.0)
+            let progress = (timestamp - lastTickTime) / currentInterval;
+            if (progress > 1) progress = 1;
+            if (progress < 0) progress = 0;
+
+            // Update Particle Positions
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update Floating texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                floatingTexts[i].update();
+                if (floatingTexts[i].alpha <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+
+            drawEverything(progress);
+            requestAnimationFrame(animateLoop);
+        }
+
+        // Render Frame with exact position interpolation
+        function drawEverything(progress) {
+            ctx.save();
+
+            // Clear view - 산뜻하게 밝아진 과수원 연초록 잔디 (Lighter Cozy Meadow Green)
+            ctx.fillStyle = '#43a047'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Handle Screen Shake Translation
+            if (shakeTime > 0) {
+                const dx = (Math.random() - 0.5) * shakeIntensity;
+                const dy = (Math.random() - 0.5) * shakeIntensity;
+                ctx.translate(dx, dy);
+            }
+
+            // Light green checkerboard pattern (Brightened)
+            ctx.fillStyle = '#4caf50';
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    if ((x + y) % 2 === 0) {
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+
+            // Draw Active Apples
+            items.forEach(item => item.draw());
+
+            // --- 뱀 꼬리부터 머리까지 하나의 부드러운 유기적 라인으로 렌더링하기 위한 보간 포인트 사전 계산 ---
+            let drawPoints = [];
+            snake.forEach((part, index) => {
+                const prevPart = prevSnake[index] || part;
+                let drawX = lerp(prevPart.x, part.x, progress);
+                let drawY = lerp(prevPart.y, part.y, progress);
+
+                // Arcade wrap glide correction
+                if (Math.abs(part.x - prevPart.x) > 1) {
+                    if (part.x < prevPart.x) { // Left-wrapped
+                        drawX = lerp(prevPart.x, part.x + GRID_SIZE, progress);
+                        if (drawX >= GRID_SIZE) drawX -= GRID_SIZE;
+                    } else { // Right-wrapped
+                        drawX = lerp(prevPart.x + GRID_SIZE, part.x, progress);
+                        if (drawX >= GRID_SIZE) drawX -= GRID_SIZE;
+                    }
+                }
+                if (Math.abs(part.y - prevPart.y) > 1) {
+                    if (part.y < prevPart.y) { // Up-wrapped
+                        drawY = lerp(prevPart.y, part.y + GRID_SIZE, progress);
+                        if (drawY >= GRID_SIZE) drawY -= GRID_SIZE;
+                    } else { // Down-wrapped
+                        drawY = lerp(prevPart.y + GRID_SIZE, part.y, progress);
+                        if (drawY >= GRID_SIZE) drawY -= GRID_SIZE;
+                    }
+                }
+
+                drawPoints.push({
+                    x: drawX * tileSize + tileSize / 2,
+                    y: drawY * tileSize + tileSize / 2
+                });
+            });
+
+            // 1. 단일 연결 패스 그리기 (몸통 한 줄로 잇기)
+            if (drawPoints.length > 0) {
+                ctx.save();
+                
+                if (rainbowTimer > 0) {
+                    // 무지개 상태일 때는 세그먼트별로 연결하여 아름다운 점진적 그라데이션 선을 만듭니다.
+                    for (let i = drawPoints.length - 1; i > 0; i--) {
+                        const p1 = drawPoints[i-1];
+                        const p2 = drawPoints[i];
+                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                        
+                        // 아케이드 관통 시 선이 쭉 찢어지는 현상 방지
+                        if (dist < tileSize * 1.8) {
+                            ctx.beginPath();
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineWidth = tileSize - 5;
+                            const shift = (i * 15 + performance.now() / 4) % 360;
+                            ctx.strokeStyle = `hsl(${shift}, 85%, 60%)`;
+                            ctx.shadowBlur = 12;
+                            ctx.shadowColor = `hsla(${shift}, 85%, 60%, 0.8)`;
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    }
+                } else {
+                    // 일반 모드에서는 하나의 끊김 없는 금빛 바디 스트로크를 그립니다.
+                    ctx.beginPath();
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineWidth = tileSize - 6;
+                    ctx.strokeStyle = '#ffe082'; // 아늑하고 달콤한 허니 골드빛 몸통
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+
+                    ctx.moveTo(drawPoints[drawPoints.length - 1].x, drawPoints[drawPoints.length - 1].y);
+                    for (let i = drawPoints.length - 2; i >= 0; i--) {
+                        const p1 = drawPoints[i+1];
+                        const p2 = drawPoints[i];
+                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                        
+                        if (dist > tileSize * 1.8) {
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.moveTo(p2.x, p2.y);
+                        } else {
+                            ctx.lineTo(p2.x, p2.y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // 2. 뱀의 머리 상세 렌더링 (단일 몸통 위에 자연스럽게 얹어짐)
+                const headPt = drawPoints[0];
+                const r = tileSize / 2;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(headPt.x, headPt.y, (tileSize - 2) / 2, 0, Math.PI * 2);
+                ctx.fillStyle = rainbowTimer > 0 ? `hsl(${performance.now() / 4 % 360}, 85%, 60%)` : '#ffb74d';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                ctx.fill();
+
+                // Invincible Shield Halo Effect for Rainbow Mode
+                if (rainbowTimer > 0) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(headPt.x, headPt.y, r + 4, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Small green leaf crown on head
+                ctx.fillStyle = '#81c784';
+                ctx.beginPath();
+                ctx.ellipse(headPt.x, headPt.y - r + 3, 4, 1.8, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tiny black eyes
+                ctx.fillStyle = '#3e2723';
+                let eyeX1, eyeY1, eyeX2, eyeY2;
+                const offset = tileSize * 0.22;
+
+                if (direction.x !== 0) {
+                    eyeX1 = headPt.x + (direction.x * offset);
+                    eyeX2 = headPt.x + (direction.x * offset);
+                    eyeY1 = headPt.y - offset;
+                    eyeY2 = headPt.y + offset;
+                } else {
+                    eyeX1 = headPt.x - offset;
+                    eyeX2 = headPt.x + offset;
+                    eyeY1 = headPt.y + (direction.y * offset);
+                    eyeY2 = headPt.y + (direction.y * offset);
+                }
+
+                ctx.beginPath();
+                ctx.arc(eyeX1, eyeY1, 2, 0, Math.PI * 2);
+                ctx.arc(eyeX2, eyeY2, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // Draw Splashing Particles
+            particles.forEach(p => p.draw());
+
+            // Draw Score Floating Popups
+            floatingTexts.forEach(ft => ft.draw());
+
+            ctx.restore();
+        }
+
+        // Game Over Trigger
+        function triggerGameOver(reason) {
+            isPlaying = false;
+            sound.playCrash();
+
+            // Store highscore
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('cozy_snake_highscore', highScore);
+                document.getElementById('highScoreDisplay').innerText = String(highScore).padStart(5, '0');
+            }
+
+            document.getElementById('gameOverReason').innerText = reason;
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalLevel').innerText = currentLevel;
+
+            const goScreen = document.getElementById('gameOverScreen');
+            goScreen.classList.remove('hidden');
+            setTimeout(() => { goScreen.classList.add('opacity-100'); }, 10);
+        }
+
+        // Pause/Resume Actions
+        function togglePause() {
+            if (!isPlaying) return;
+            isPaused = !isPaused;
+
+            const pScreen = document.getElementById('pauseScreen');
+            if (isPaused) {
+                pScreen.classList.remove('hidden');
+                setTimeout(() => pScreen.classList.add('opacity-100'), 10);
+            } else {
+                pScreen.classList.remove('opacity-100');
+                setTimeout(() => pScreen.classList.add('hidden'), 200);
+                lastTickTime = performance.now(); // reset timer to prevent immediate ticks
+            }
+        }
+
+        // Register Keyboard Controls with Queue Buffer for Ultra Responsiveness
+        window.addEventListener('keydown', (e) => {
+            const code = e.code;
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
+                e.preventDefault();
+            }
+
+            if (code === 'Space' || code === 'Escape') {
+                togglePause();
+                return;
+            }
+
+            if (!isPlaying || isPaused) return;
+
+            let newDir = null;
+            switch (code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    newDir = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    newDir = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    newDir = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    newDir = { x: 1, y: 0 };
+                    break;
+            }
+
+            if (newDir) {
+                // Determine the last planned direction (either the last item in the queue, or the current active direction)
+                const lastPlanned = directionQueue.length > 0 ? directionQueue[directionQueue.length - 1] : direction;
+                
+                // Prevent snapping back 180 degrees directly into itself
+                if (newDir.x !== -lastPlanned.x || newDir.y !== -lastPlanned.y) {
+                    // Limit queue buffer to 2 steps to avoid unwanted lagging feel
+                    if (directionQueue.length < 2) {
+                        directionQueue.push(newDir);
+                    }
+                }
+            }
+        });
+
+        // Swipe Gestures for Mobile Orchard
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isPlaying || isPaused) return;
+            const touch = e.touches[0];
+            touchStart = { x: touch.clientX, y: touch.clientY };
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (!isPlaying || isPaused) return;
+            const touch = e.changedTouches[0];
+            const diffX = touch.clientX - touchStart.x;
+            const diffY = touch.clientY - touchStart.y;
+
+            if (Math.abs(diffX) > 25 || Math.abs(diffY) > 25) {
+                let newDir = null;
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX > 0) newDir = { x: 1, y: 0 };
+                    else newDir = { x: -1, y: 0 };
+                } else {
+                    if (diffY > 0) newDir = { x: 0, y: 1 };
+                    else newDir = { x: 0, y: -1 };
+                }
+
+                if (newDir) {
+                    const lastPlanned = directionQueue.length > 0 ? directionQueue[directionQueue.length - 1] : direction;
+                    if (newDir.x !== -lastPlanned.x || newDir.y !== -lastPlanned.y) {
+                        if (directionQueue.length < 2) {
+                            directionQueue.push(newDir);
+                        }
+                    }
+                }
+            }
+        }, { passive: true });
+
+        // Virtual Pad Mapping
+        function setupVirtualControls() {
+            const triggerMove = (dx, dy) => {
+                if (!isPlaying || isPaused) return;
+                const newDir = { x: dx, y: dy };
+                const lastPlanned = directionQueue.length > 0 ? directionQueue[directionQueue.length - 1] : direction;
+                
+                if (newDir.x !== -lastPlanned.x || newDir.y !== -lastPlanned.y) {
+                    if (directionQueue.length < 2) {
+                        directionQueue.push(newDir);
+                    }
+                }
+            };
+
+            document.getElementById('ctrlUp').addEventListener('touchstart', (e) => { e.preventDefault(); triggerMove(0, -1); });
+            document.getElementById('ctrlDown').addEventListener('touchstart', (e) => { e.preventDefault(); triggerMove(0, 1); });
+            document.getElementById('ctrlLeft').addEventListener('touchstart', (e) => { e.preventDefault(); triggerMove(-1, 0); });
+            document.getElementById('ctrlRight').addEventListener('touchstart', (e) => { e.preventDefault(); triggerMove(1, 0); });
+            
+            document.getElementById('ctrlUp').addEventListener('mousedown', () => triggerMove(0, -1));
+            document.getElementById('ctrlDown').addEventListener('mousedown', () => triggerMove(0, 1));
+            document.getElementById('ctrlLeft').addEventListener('mousedown', () => triggerMove(-1, 0));
+            document.getElementById('ctrlRight').addEventListener('mousedown', () => triggerMove(1, 0));
+        }
+        setupVirtualControls();
+
+        // UI Buttons Interactions
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            const startPanel = document.getElementById('startScreen');
+            startPanel.classList.add('opacity-0');
+            setTimeout(() => {
+                startPanel.classList.add('hidden');
+            }, 300);
+
+            sound.init();
+            initGame();
+            isPlaying = true;
+            requestAnimationFrame(animateLoop);
+        });
+
+        document.getElementById('restartGameBtn').addEventListener('click', () => {
+            const goScreen = document.getElementById('gameOverScreen');
+            goScreen.classList.remove('opacity-100');
+            setTimeout(() => {
+                goScreen.classList.add('hidden');
+                initGame();
+                isPlaying = true;
+                requestAnimationFrame(animateLoop);
+            }, 200);
+        });
+
+        document.getElementById('resumeGameBtn').addEventListener('click', () => {
+            togglePause();
+        });
+
+        document.getElementById('inGamePauseBtn').addEventListener('click', () => {
+            togglePause();
+        });
+
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            const icon = document.getElementById('soundIcon');
+            if (sound.enabled) {
+                icon.className = 'fa-solid fa-volume-high';
+                icon.parentElement.classList.remove('text-stone-400');
+                icon.parentElement.classList.add('text-emerald-600');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark';
+                icon.parentElement.classList.remove('text-emerald-600');
+                icon.parentElement.classList.add('text-stone-400');
+            }
+        });
+
+        // Mode Toggles
+        const modeClassicBtn = document.getElementById('modeClassic');
+        const modeArcadeBtn = document.getElementById('modeArcade');
+
+        function setGameMode(mode) {
+            gameMode = mode;
+            if (mode === 'classic') {
+                modeClassicBtn.className = 'py-2.5 px-3 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-700 text-xs font-bold transition hover:bg-emerald-500/20';
+                modeArcadeBtn.className = 'py-2.5 px-3 rounded-xl border border-stone-200 bg-white text-stone-400 text-xs font-bold transition hover:bg-stone-50';
+            } else {
+                modeArcadeBtn.className = 'py-2.5 px-3 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-700 text-xs font-bold transition hover:bg-emerald-500/20';
+                modeClassicBtn.className = 'py-2.5 px-3 rounded-xl border border-stone-200 bg-white text-stone-400 text-xs font-bold transition hover:bg-stone-50';
+            }
+            if (isPlaying) {
+                triggerGameOver("설정 변경으로 시스템이 초기화되었습니다.");
+            }
+        }
+        modeClassicBtn.addEventListener('click', () => setGameMode('classic'));
+        modeArcadeBtn.addEventListener('click', () => setGameMode('arcade'));
+
+        // Speed Speeds Toggles
+        const diffBtns = document.querySelectorAll('.diff-btn');
+        diffBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                diffBtns.forEach(b => {
+                    b.className = 'diff-btn py-2 rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50';
+                });
+                btn.className = 'diff-btn py-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-700';
+                baseSpeed = parseInt(btn.dataset.speed);
+                if (isPlaying) {
+                    triggerGameOver("속도 세팅을 변경하여 새로 시작합니다.");
+                }
+            });
+        });
+
+        // Help Modal Binding
+        const helpModal = document.getElementById('helpModal');
+        const openHelp = () => {
+            helpModal.classList.remove('hidden');
+            setTimeout(() => {
+                helpModal.classList.add('opacity-100');
+                helpModal.querySelector('div').classList.remove('scale-95');
+                helpModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        };
+        const closeHelp = () => {
+            helpModal.classList.remove('opacity-100');
+            helpModal.querySelector('div').classList.remove('scale-100');
+            helpModal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => helpModal.classList.add('hidden'), 300);
+        };
+
+        document.getElementById('helpBtn').addEventListener('click', openHelp);
+        document.getElementById('closeHelpBtn').addEventListener('click', closeHelp);
+        document.getElementById('confirmHelpBtn').addEventListener('click', closeHelp);
+
+        // Pre-render state
+        window.onload = function() {
+            drawEverything(0);
+        }
+    </script>
+</body>
+</html>
