@@ -1,3 +1,6 @@
+
+
+Index · HTML
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -224,14 +227,14 @@
                     <li class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 text-lg">🍎</div>
                         <div>
-                            <p class="font-black text-stone-800">새빨간 사과 <span class="text-red-500">(85% 확률)</span></p>
+                            <p class="font-black text-stone-800">새빨간 사과 <span class="text-red-500">(70% 확률)</span></p>
                             <p class="text-[11px] text-stone-500">점수 +10 획득하며 몸이 한 칸 늘어납니다.</p>
                         </div>
                     </li>
                     <li class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 text-lg">🍏</div>
                         <div>
-                            <p class="font-black text-amber-700">황금 사과 <span class="text-amber-600">(10% 확률)</span></p>
+                            <p class="font-black text-amber-700">황금 사과 <span class="text-amber-600">(7% 확률)</span></p>
                             <p class="text-[11px] text-stone-500">점수 +30 획득하며 <strong>몸이 부드럽게 3칸 증가</strong>합니다.</p>
                         </div>
                     </li>
@@ -240,6 +243,27 @@
                         <div>
                             <p class="font-black text-purple-700">무지개 사과 <span class="text-purple-600">(5% 확률)</span></p>
                             <p class="text-[11px] text-stone-500"><strong>5초간 속도 50% 증가 및 무적</strong>(몸에 닿아도 안 죽음) 상태가 됩니다!</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0 text-lg">🌱</div>
+                        <div>
+                            <p class="font-black text-green-700">씨앗 <span class="text-green-600">(8% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500">먹으면 맵 랜덤 위치에 <strong>일반 사과 2개</strong>가 즉시 생성됩니다.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0 text-lg">✨</div>
+                        <div>
+                            <p class="font-black text-yellow-700">황금씨앗 <span class="text-yellow-600">(3% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500">먹으면 맵 랜덤 위치에 <strong>일반 사과 5개 + 황금사과 3개</strong>가 즉시 생성됩니다.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 text-lg">🧲</div>
+                        <div>
+                            <p class="font-black text-slate-700">자석 <span class="text-slate-600">(7% 확률)</span></p>
+                            <p class="text-[11px] text-stone-500">먹으면 <strong>맵의 모든 사과·아이템이 뱀 머리로 빨려들어와</strong> 닿는 순간 각각의 효과가 발동됩니다.</p>
                         </div>
                     </li>
                 </ul>
@@ -399,7 +423,7 @@
         let directionQueue = [];
         
         let baseSpeed = 135;   // ms per logical tick (Adjusted from 120 for slightly relaxed difficulty)
-        let lastTickTime = 0;  // Timestamp of last physics tick
+        let physicsAccumulator = 0; // 프레임 간 누적 시간(ms). 고정 타임스텝 물리 처리에 사용되어, 레벨업/무지개 등으로 속도가 바뀌어도 끊김 없이 이어집니다.
         let isPlaying = false;
         let isPaused = false;
         let score = 0;
@@ -408,6 +432,7 @@
         let gameMode = 'classic'; // 'classic' or 'arcade'
 
         let items = []; // Holds active 사과 instances
+        let flyingItems = []; // 자석 효과로 뱀 머리를 향해 빨려들어가는 중인 아이템들
         let obstacles = []; // ALWAYS EMPTY
         let particles = []; // Leaf / Petal explosions
 
@@ -472,18 +497,48 @@
         // Display Highscore
         document.getElementById('highScoreDisplay').innerText = String(highScore).padStart(5, '0');
 
-        // Custom Item Spawner with precise probabilities: 사과(85%), 황금사과(10%), 무지개사과(5%)
+        // Custom Item Spawner with precise probabilities: 사과(70%), 황금사과(7%), 무지개사과(5%), 씨앗(8%), 황금씨앗(3%), 자석(7%)
         class OrchardItem {
             constructor(x, y, type) {
                 this.x = x;
                 this.y = y;
-                this.type = type; // 'apple' (85%), 'gold_apple' (10%), 'rainbow_apple' (5%)
+                this.type = type; // 'apple', 'gold_apple', 'rainbow_apple', 'seed', 'gold_seed', 'magnet'
                 this.pulse = Math.random() * Math.PI; // Pulse offset
+
+                // 자석 흡입 애니메이션 상태 (평소엔 false, 자석 발동 시 true로 전환)
+                this.flying = false;
+                this.px = null; // flying 상태일 때 실제 렌더링에 쓰이는 픽셀 좌표
+                this.py = null;
+            }
+
+            // 자석에 의해 뱀 머리 쪽으로 빨려들어가는 모드로 전환
+            startFlying() {
+                this.flying = true;
+                this.px = this.x * tileSize + tileSize / 2;
+                this.py = this.y * tileSize + tileSize / 2;
+            }
+
+            // 매 프레임 목표(뱀 머리) 픽셀 좌표를 향해 부드럽게 가속 이동. 남은 거리를 반환.
+            updateFlying(targetX, targetY) {
+                const dx = targetX - this.px;
+                const dy = targetY - this.py;
+                const dist = Math.hypot(dx, dy);
+                // 멀 때는 천천히, 머리에 가까워질수록 더 강하게 끌려들어가는 자연스러운 가속 곡선
+                const pull = 0.15 + (1 - Math.min(dist / (tileSize * 9), 1)) * 0.35;
+                this.px += dx * pull;
+                this.py += dy * pull;
+                return dist;
             }
 
             draw() {
-                const px = this.x * tileSize;
-                const py = this.y * tileSize;
+                let px, py;
+                if (this.flying) {
+                    px = this.px - tileSize / 2;
+                    py = this.py - tileSize / 2;
+                } else {
+                    px = this.x * tileSize;
+                    py = this.y * tileSize;
+                }
                 const half = tileSize / 2;
 
                 this.pulse += 0.07;
@@ -618,6 +673,119 @@
                     ctx.fillRect(8, -8, 2, 2);
                     ctx.fillRect(-10, 6, 2, 2);
                     ctx.restore();
+
+                } else if (this.type === 'seed') {
+                    // 씨앗: 아몬드형 갈색 씨앗 + 작은 새싹
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = 'rgba(101, 67, 33, 0.4)';
+
+                    ctx.strokeStyle = '#2e7d32';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -3);
+                    ctx.quadraticCurveTo(2, -9, 5, -8);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#66bb6a';
+                    ctx.beginPath();
+                    ctx.ellipse(3, -7, 3, 1.6, Math.PI / -4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#8d6e63';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, 6, 8, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#6d4c41';
+                    ctx.beginPath();
+                    ctx.ellipse(1.5, 3, 3, 5, 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                    ctx.beginPath();
+                    ctx.ellipse(-2, -1, 1.5, 3, -0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'gold_seed') {
+                    // 황금씨앗: 금빛 아몬드형 씨앗 + 반짝임
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
+
+                    ctx.strokeStyle = '#8d6e00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -3);
+                    ctx.quadraticCurveTo(2, -9, 5, -8);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffca28';
+                    ctx.beginPath();
+                    ctx.ellipse(3, -7, 3, 1.6, Math.PI / -4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#f9a825';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, 6, 8, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#fdd835';
+                    ctx.beginPath();
+                    ctx.ellipse(1.5, 3, 3, 5, 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    ctx.beginPath();
+                    ctx.ellipse(-2, -1, 1.5, 3, -0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    const spSeed = Math.max(0.5, Math.sin(this.pulse * 2) * 2);
+                    ctx.beginPath();
+                    ctx.arc(5, 6, spSeed, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'magnet') {
+                    // 자석: U자형(말굽) 자석
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(239, 68, 68, 0.5)';
+
+                    ctx.lineCap = 'round';
+                    ctx.lineWidth = 5;
+
+                    // 왼쪽 다리 (빨강 극)
+                    ctx.strokeStyle = '#e53935';
+                    ctx.beginPath();
+                    ctx.moveTo(-5, 8);
+                    ctx.lineTo(-5, -2);
+                    ctx.stroke();
+
+                    // 오른쪽 다리 (은색 극)
+                    ctx.strokeStyle = '#78909c';
+                    ctx.beginPath();
+                    ctx.moveTo(5, 8);
+                    ctx.lineTo(5, -2);
+                    ctx.stroke();
+
+                    // U자형 곡선 몸통
+                    ctx.strokeStyle = '#b0bec5';
+                    ctx.beginPath();
+                    ctx.arc(0, -2, 5, Math.PI, 0, false);
+                    ctx.stroke();
+
+                    // 극 표시 (끝단 블록)
+                    ctx.fillStyle = '#e53935';
+                    ctx.fillRect(-8, 6, 6, 4);
+                    ctx.fillStyle = '#78909c';
+                    ctx.fillRect(2, 6, 6, 4);
+
+                    // 자기장 표시 점선 호
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.arc(0, 2, 11 + Math.sin(this.pulse) * 1.5, Math.PI * 0.15, Math.PI * 0.85, false);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
 
                 ctx.restore();
@@ -673,11 +841,19 @@
         function createExplosion(x, y, type) {
             const screenX = x * tileSize + tileSize / 2;
             const screenY = y * tileSize + tileSize / 2;
+            createExplosionAtPixel(screenX, screenY, type);
+        }
+
+        // 픽셀 좌표를 직접 받는 버전 (자석 흡입 등 grid 좌표가 없는 애니메이션에서 사용)
+        function createExplosionAtPixel(screenX, screenY, type) {
             let colors = [];
-            
+
             if (type === 'apple') colors = ['#f43f5e', '#ef4444', '#b91c1c', '#a7f3d0'];
             else if (type === 'gold_apple') colors = ['#f59e0b', '#fbbf24', '#ffb300', '#fffbeb', '#fef3c7'];
             else if (type === 'rainbow_apple') colors = ['#ff007f', '#ff7f00', '#ffea00', '#00ff7f', '#00eaff', '#7f00ff'];
+            else if (type === 'seed') colors = ['#8d6e63', '#66bb6a', '#c8e6c9', '#a5d6a7'];
+            else if (type === 'gold_seed') colors = ['#f9a825', '#fdd835', '#fff9c4', '#ffe082'];
+            else if (type === 'magnet') colors = ['#e53935', '#78909c', '#eceff1', '#ffffff'];
             else colors = ['#81c784', '#a7f3d0', '#ffffff']; // Default sweet sparkles
 
             for (let i = 0; i < 22; i++) {
@@ -686,8 +862,10 @@
             }
         }
 
-        // Spawn Apples with probabilistic weighted logic: 사과(85%), 황금사과(10%), 무지개사과(5%)
-        function spawnItem() {
+        // Spawn Apples with probabilistic weighted logic:
+        // 사과(70%), 황금사과(7%), 무지개사과(5%), 씨앗(8%), 황금씨앗(3%), 자석(7%)
+        // forcedType을 넘기면 확률 계산 없이 해당 타입으로 강제 생성 (씨앗류 효과에서 사용)
+        function spawnItem(forcedType) {
             let rx, ry;
             let occupied = true;
             while (occupied) {
@@ -702,13 +880,23 @@
                 }
             }
 
-            // 확률 조정: 사과(85%), 황금사과(10%), 무지개사과(5%)
-            const rng = Math.random();
-            let type = 'apple';
-            if (rng > 0.85 && rng <= 0.95) {
-                type = 'gold_apple';
-            } else if (rng > 0.95) {
-                type = 'rainbow_apple';
+            let type = forcedType;
+            if (!type) {
+                // 확률 조정: 사과(70%), 황금사과(7%), 무지개사과(5%), 씨앗(8%), 황금씨앗(3%), 자석(7%)
+                const rng = Math.random();
+                if (rng < 0.70) {
+                    type = 'apple';
+                } else if (rng < 0.77) {
+                    type = 'gold_apple';
+                } else if (rng < 0.82) {
+                    type = 'rainbow_apple';
+                } else if (rng < 0.90) {
+                    type = 'seed';
+                } else if (rng < 0.93) {
+                    type = 'gold_seed';
+                } else {
+                    type = 'magnet';
+                }
             }
 
             items.push(new OrchardItem(rx, ry, type));
@@ -732,6 +920,7 @@
             rainbowTimer = 0;
             
             items = [];
+            flyingItems = [];
             particles = [];
             floatingTexts = [];
             obstacles = []; // Ensure empty
@@ -740,7 +929,8 @@
             spawnItem();
             spawnItem(); // Maintain 2 apples on map
             
-            lastTickTime = performance.now();
+            physicsAccumulator = 0;
+            window.lastFrameTime = undefined;
         }
 
         function updateHUD() {
@@ -881,11 +1071,108 @@
                 createExplosion(item.x, item.y, 'rainbow_apple');
                 triggerShake(250, 8); // Satisfying rainbow shake
                 floatingTexts.push(new FloatingText(textX, textY, "RAINBOW 무적! 🌈", "#c084fc"));
+            } else if (item.type === 'seed') {
+                // 씨앗: 맵에 랜덤하게 일반 사과 2개를 즉시 추가 생성
+                growthPending += 1;
+                addedScore = 5;
+                sound.playEat();
+                createExplosion(item.x, item.y, 'seed');
+                triggerShake(150, 4);
+                floatingTexts.push(new FloatingText(textX, textY, "씨앗 심기! 🌱 +2", "#66bb6a"));
+                for (let i = 0; i < 2; i++) spawnItem('apple');
+            } else if (item.type === 'gold_seed') {
+                // 황금씨앗: 맵에 랜덤하게 일반 사과 5개 + 황금사과 3개를 즉시 추가 생성
+                growthPending += 2;
+                addedScore = 15;
+                sound.playGoldEat();
+                createExplosion(item.x, item.y, 'gold_seed');
+                triggerShake(220, 7);
+                floatingTexts.push(new FloatingText(textX, textY, "황금씨앗! ✨🌱 +8", "#fbbf24"));
+                for (let i = 0; i < 5; i++) spawnItem('apple');
+                for (let i = 0; i < 3; i++) spawnItem('gold_apple');
+            } else if (item.type === 'magnet') {
+                // 자석: 즉시 모두 흡수하는 대신, 맵 위 모든 아이템을 뱀 머리 쪽으로 빨아들이는
+                // 비행 아이템으로 전환합니다. 실제 효과(점수/성장 등)는 머리에 닿는 순간 발동됩니다.
+                growthPending += 1;
+                addedScore = 5;
+                sound.playGoldEat();
+                createExplosion(item.x, item.y, 'magnet');
+                triggerShake(200, 6);
+                floatingTexts.push(new FloatingText(textX, textY, "자석 발동! 🧲", "#78909c"));
+
+                items.forEach(otherItem => {
+                    if (otherItem === item) return; // 자기 자신(자석)은 이미 처리했으니 제외
+                    otherItem.startFlying();
+                    flyingItems.push(otherItem);
+                });
+                items = []; // 흡입 대상들은 grid에서 제거하고 flyingItems로 이동
+
+                // 맵이 완전히 비지 않도록 새 아이템 하나 보충
+                spawnItem();
             }
 
             score += addedScore;
 
             // Handle Level Up
+            const nextLevelTarget = Math.floor(score / 100) + 1;
+            if (nextLevelTarget > currentLevel) {
+                currentLevel = nextLevelTarget;
+                sound.playLevelUp();
+            }
+
+            updateHUD();
+        }
+
+        // 자석에 의해 빨려들어가던 아이템이 뱀 머리에 도달했을 때, 그 순간 실제 효과를 발동시킵니다.
+        function resolveFlyingItemEffect(item) {
+            let addedScore = 0;
+            let addedGrowth = 0;
+            let label = "";
+            let color = "#ffffff";
+
+            if (item.type === 'apple') {
+                addedScore = 10; addedGrowth = 1;
+                label = "+10"; color = "#f43f5e";
+                sound.playEat();
+                triggerShake(80, 2);
+            } else if (item.type === 'gold_apple') {
+                addedScore = 30; addedGrowth = 3;
+                label = "+30 🌟"; color = "#fbbf24";
+                sound.playGoldEat();
+                triggerShake(140, 4);
+            } else if (item.type === 'rainbow_apple') {
+                addedScore = 10; addedGrowth = 1;
+                label = "RAINBOW 🌈"; color = "#c084fc";
+                rainbowTimer = Math.max(rainbowTimer, 5000);
+                sound.playRainbow();
+                triggerShake(160, 5);
+            } else if (item.type === 'seed') {
+                addedScore = 5; addedGrowth = 1;
+                label = "🌱 +2"; color = "#66bb6a";
+                sound.playEat();
+                triggerShake(80, 2);
+                for (let i = 0; i < 2; i++) spawnItem('apple');
+            } else if (item.type === 'gold_seed') {
+                addedScore = 15; addedGrowth = 2;
+                label = "✨🌱 +8"; color = "#fbbf24";
+                sound.playGoldEat();
+                triggerShake(140, 4);
+                for (let i = 0; i < 5; i++) spawnItem('apple');
+                for (let i = 0; i < 3; i++) spawnItem('gold_apple');
+            } else if (item.type === 'magnet') {
+                // 흡입 중이던 다른 자석이 함께 딸려온 경우의 예외 처리
+                addedScore = 5; addedGrowth = 1;
+                label = "🧲"; color = "#78909c";
+                sound.playGoldEat();
+                triggerShake(100, 3);
+            }
+
+            score += addedScore;
+            growthPending += addedGrowth;
+
+            createExplosionAtPixel(item.px, item.py, item.type);
+            floatingTexts.push(new FloatingText(item.px, item.py - 8, label, color));
+
             const nextLevelTarget = Math.floor(score / 100) + 1;
             if (nextLevelTarget > currentLevel) {
                 currentLevel = nextLevelTarget;
@@ -904,34 +1191,42 @@
         function animateLoop(timestamp) {
             if (!isPlaying) return;
 
-            // Track continuous timer for logical physics ticks
-            const currentInterval = getCurrentInterval();
-            const elapsed = timestamp - lastTickTime;
+            // 실제 경과 프레임 시간(dt)을 기준으로 누적 처리 (고정 타임스텝)
+            // -> 레벨업/무지개 버프 등으로 tick 간격이 바뀌어도 순간적으로 튀지 않습니다.
+            const dt = window.lastFrameTime ? (timestamp - window.lastFrameTime) : 0;
+            window.lastFrameTime = timestamp;
 
             if (!isPaused) {
                 // Decay rainbow timer by elapsed frame time
                 if (rainbowTimer > 0) {
-                    rainbowTimer -= (timestamp - (window.lastFrameTime || timestamp));
+                    rainbowTimer -= dt;
                     if (rainbowTimer < 0) rainbowTimer = 0;
                     updateHUD();
                 }
 
                 // Decay shake timer
                 if (shakeTime > 0) {
-                    shakeTime -= (timestamp - (window.lastFrameTime || timestamp));
+                    shakeTime -= dt;
                 }
 
-                if (elapsed >= currentInterval) {
+                physicsAccumulator += dt;
+
+                // 브라우저 탭 전환 등으로 dt가 비정상적으로 커졌을 때 한꺼번에 여러 틱이 몰아치지 않도록 상한 설정
+                const maxCatchup = 250;
+                if (physicsAccumulator > maxCatchup) physicsAccumulator = maxCatchup;
+
+                // 누적된 시간만큼 물리 틱을 소비 (한 프레임에 최대 5틱까지만 허용해 안전장치)
+                let safetyCounter = 0;
+                while (physicsAccumulator >= getCurrentInterval() && safetyCounter < 5) {
                     updatePhysics();
-                    // Keep overflow fractional time to stay precise
-                    lastTickTime = timestamp - (elapsed % currentInterval);
+                    physicsAccumulator -= getCurrentInterval();
+                    safetyCounter++;
                 }
             }
 
-            window.lastFrameTime = timestamp;
-
             // Calculate current interpolation progress (0.0 to 1.0)
-            let progress = (timestamp - lastTickTime) / currentInterval;
+            const currentInterval = getCurrentInterval();
+            let progress = physicsAccumulator / currentInterval;
             if (progress > 1) progress = 1;
             if (progress < 0) progress = 0;
 
@@ -1016,19 +1311,74 @@
                 });
             });
 
-            // 1. 단일 연결 패스 그리기 (몸통 한 줄로 잇기)
+            // --- 자석 흡입 이펙트: 빨려들어가는 중인 아이템들을 뱀 머리 쪽으로 끌어당기고, 도달하면 효과 발동 ---
+            if (drawPoints.length > 0 && flyingItems.length > 0) {
+                const headPt = drawPoints[0];
+                if (!isPaused) {
+                    for (let i = flyingItems.length - 1; i >= 0; i--) {
+                        const fitem = flyingItems[i];
+                        const distToHead = fitem.updateFlying(headPt.x, headPt.y);
+                        if (distToHead < tileSize * 0.5) {
+                            resolveFlyingItemEffect(fitem);
+                            flyingItems.splice(i, 1);
+                        }
+                    }
+                }
+                // 머리에 닿기 직전까지는 계속 그려서 빨려들어가는 모습이 보이도록 함
+                flyingItems.forEach(fitem => fitem.draw());
+            }
+
+            // 1. 단일 연결 패스 그리기 (몸통 한 줄로 잇기, 커브를 quadratic curve로 부드럽게 처리)
             if (drawPoints.length > 0) {
                 ctx.save();
-                
+
+                // 꼬리 -> 머리 순서로 재정렬 (곡선 계산 편의를 위함)
+                const orderedPts = [];
+                for (let i = drawPoints.length - 1; i >= 0; i--) {
+                    orderedPts.push(drawPoints[i]);
+                }
+
+                // 아케이드 관통(텔레포트)으로 점 사이 거리가 갑자기 멀어지는 구간은 끊어서 그룹화
+                const segments = [[orderedPts[0]]];
+                for (let i = 1; i < orderedPts.length; i++) {
+                    const p1 = orderedPts[i - 1];
+                    const p2 = orderedPts[i];
+                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                    if (dist > tileSize * 1.8) {
+                        segments.push([p2]);
+                    } else {
+                        segments[segments.length - 1].push(p2);
+                    }
+                }
+
+                // 각 점을 지나는 부드러운 곡선 경로를 그리는 헬퍼 (모서리를 quadraticCurveTo로 둥글게 처리)
+                const traceSmoothPath = (pts) => {
+                    if (pts.length < 2) return;
+                    ctx.moveTo(pts[0].x, pts[0].y);
+                    if (pts.length === 2) {
+                        ctx.lineTo(pts[1].x, pts[1].y);
+                        return;
+                    }
+                    for (let i = 1; i < pts.length - 2; i++) {
+                        const xc = (pts[i].x + pts[i + 1].x) / 2;
+                        const yc = (pts[i].y + pts[i + 1].y) / 2;
+                        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+                    }
+                    const n = pts.length;
+                    ctx.quadraticCurveTo(pts[n - 2].x, pts[n - 2].y, pts[n - 1].x, pts[n - 1].y);
+                };
+
                 if (rainbowTimer > 0) {
-                    // 무지개 상태일 때는 세그먼트별로 연결하여 아름다운 점진적 그라데이션 선을 만듭니다.
-                    for (let i = drawPoints.length - 1; i > 0; i--) {
-                        const p1 = drawPoints[i-1];
-                        const p2 = drawPoints[i];
-                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                        
-                        // 아케이드 관통 시 선이 쭉 찢어지는 현상 방지
-                        if (dist < tileSize * 1.8) {
+                    // 무지개 상태일 때는 정점 중심의 짧은 곡선 조각들을 이어붙여 부드러운 그라데이션 커브를 만듭니다.
+                    segments.forEach(seg => {
+                        for (let i = 1; i < seg.length; i++) {
+                            const p1 = seg[i - 1];
+                            const p2 = seg[i];
+                            const prevP = seg[i - 2] || p1;
+
+                            const startPt = { x: (prevP.x + p1.x) / 2, y: (prevP.y + p1.y) / 2 };
+                            const midPt = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
                             ctx.beginPath();
                             ctx.lineCap = 'round';
                             ctx.lineJoin = 'round';
@@ -1037,13 +1387,13 @@
                             ctx.strokeStyle = `hsl(${shift}, 85%, 60%)`;
                             ctx.shadowBlur = 12;
                             ctx.shadowColor = `hsla(${shift}, 85%, 60%, 0.8)`;
-                            ctx.moveTo(p1.x, p1.y);
-                            ctx.lineTo(p2.x, p2.y);
+                            ctx.moveTo(startPt.x, startPt.y);
+                            ctx.quadraticCurveTo(p1.x, p1.y, midPt.x, midPt.y);
                             ctx.stroke();
                         }
-                    }
+                    });
                 } else {
-                    // 일반 모드에서는 하나의 끊김 없는 금빛 바디 스트로크를 그립니다.
+                    // 일반 모드에서는 하나의 끊김 없는 부드러운 곡선 바디 스트로크를 그립니다.
                     ctx.beginPath();
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
@@ -1052,20 +1402,7 @@
                     ctx.shadowBlur = 6;
                     ctx.shadowColor = 'rgba(0,0,0,0.15)';
 
-                    ctx.moveTo(drawPoints[drawPoints.length - 1].x, drawPoints[drawPoints.length - 1].y);
-                    for (let i = drawPoints.length - 2; i >= 0; i--) {
-                        const p1 = drawPoints[i+1];
-                        const p2 = drawPoints[i];
-                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                        
-                        if (dist > tileSize * 1.8) {
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(p2.x, p2.y);
-                        } else {
-                            ctx.lineTo(p2.x, p2.y);
-                        }
-                    }
+                    segments.forEach(seg => traceSmoothPath(seg));
                     ctx.stroke();
                 }
                 ctx.restore();
@@ -1166,7 +1503,7 @@
             } else {
                 pScreen.classList.remove('opacity-100');
                 setTimeout(() => pScreen.classList.add('hidden'), 200);
-                lastTickTime = performance.now(); // reset timer to prevent immediate ticks
+                window.lastFrameTime = undefined; // 정지 동안 흐른 실제 시간이 dt로 잡혀 순간이동하지 않도록 리셋
             }
         }
 
@@ -1388,3 +1725,4 @@
     </script>
 </body>
 </html>
+
